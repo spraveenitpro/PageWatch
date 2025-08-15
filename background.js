@@ -5,37 +5,56 @@ class PageWatchBackground {
   }
 
   init() {
+    // Ensure Chrome APIs are available
+    if (typeof chrome === 'undefined' || !chrome.runtime) {
+      console.error('Chrome APIs not available');
+      return;
+    }
+
     chrome.runtime.onInstalled.addListener(() => {
       this.createContextMenus();
       console.log('PageWatch extension installed');
     });
 
-    chrome.alarms.onAlarm.addListener((alarm) => {
-      this.handleAlarm(alarm);
-    });
+    if (chrome.alarms) {
+      chrome.alarms.onAlarm.addListener((alarm) => {
+        this.handleAlarm(alarm);
+      });
+    }
 
     chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       this.handleMessage(message, sender, sendResponse);
       return true;
     });
 
-    chrome.storage.onChanged.addListener((changes) => {
-      this.handleStorageChange(changes);
-    });
+    if (chrome.storage) {
+      chrome.storage.onChanged.addListener((changes) => {
+        this.handleStorageChange(changes);
+      });
+    }
   }
 
   createContextMenus() {
-    chrome.contextMenus.create({
-      id: 'pagewatch-monitor',
-      title: 'Monitor this element for changes',
-      contexts: ['all']
-    });
+    if (!chrome.contextMenus) {
+      console.warn('Context menus API not available');
+      return;
+    }
 
-    chrome.contextMenus.onClicked.addListener((info, tab) => {
-      if (info.menuItemId === 'pagewatch-monitor') {
-        chrome.tabs.sendMessage(tab.id, { action: 'startElementSelection' });
-      }
-    });
+    try {
+      chrome.contextMenus.create({
+        id: 'pagewatch-monitor',
+        title: 'Monitor this element for changes',
+        contexts: ['all']
+      });
+
+      chrome.contextMenus.onClicked.addListener((info, tab) => {
+        if (info.menuItemId === 'pagewatch-monitor') {
+          chrome.tabs.sendMessage(tab.id, { action: 'startElementSelection' });
+        }
+      });
+    } catch (error) {
+      console.error('Error creating context menus:', error);
+    }
   }
 
   async handleAlarm(alarm) {
@@ -108,7 +127,9 @@ class PageWatchBackground {
     delete monitors[monitorId];
     await chrome.storage.local.set({ monitors });
     
-    chrome.alarms.clear(`pagewatch-${monitorId}`);
+    if (chrome.alarms) {
+      chrome.alarms.clear(`pagewatch-${monitorId}`);
+    }
   }
 
   async updateMonitor(monitorId, updates) {
@@ -132,7 +153,9 @@ class PageWatchBackground {
       if (enabled) {
         this.createAlarm(monitorId, monitors[monitorId].interval);
       } else {
-        chrome.alarms.clear(`pagewatch-${monitorId}`);
+        if (chrome.alarms) {
+          chrome.alarms.clear(`pagewatch-${monitorId}`);
+        }
       }
     }
   }
@@ -151,11 +174,20 @@ class PageWatchBackground {
   }
 
   createAlarm(monitorId, intervalSeconds) {
-    chrome.alarms.clear(`pagewatch-${monitorId}`);
-    chrome.alarms.create(`pagewatch-${monitorId}`, {
-      delayInMinutes: intervalSeconds / 60,
-      periodInMinutes: intervalSeconds / 60
-    });
+    if (!chrome.alarms) {
+      console.warn('Alarms API not available');
+      return;
+    }
+
+    try {
+      chrome.alarms.clear(`pagewatch-${monitorId}`);
+      chrome.alarms.create(`pagewatch-${monitorId}`, {
+        delayInMinutes: intervalSeconds / 60,
+        periodInMinutes: intervalSeconds / 60
+      });
+    } catch (error) {
+      console.error('Error creating alarm:', error);
+    }
   }
 
   async updateAlarms() {
@@ -165,7 +197,9 @@ class PageWatchBackground {
       if (monitor.enabled) {
         this.createAlarm(monitor.id, monitor.interval);
       } else {
-        chrome.alarms.clear(`pagewatch-${monitor.id}`);
+        if (chrome.alarms) {
+          chrome.alarms.clear(`pagewatch-${monitor.id}`);
+        }
       }
     });
   }

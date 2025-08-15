@@ -151,11 +151,17 @@ class PageWatchPopup {
   }
 
   createMonitorElement(monitor) {
+    const domain = this.getDomainFromUrl(monitor.url);
+    const selectorDisplay = this.formatSelector(monitor.selector);
+    
     const div = document.createElement('div');
     div.className = 'monitor-item';
     div.innerHTML = `
       <div class="monitor-header">
-        <div class="monitor-selector">${monitor.selector}</div>
+        <div class="monitor-info-main">
+          <div class="monitor-domain">${domain}</div>
+          <div class="monitor-selector">${selectorDisplay}</div>
+        </div>
         <div class="monitor-actions">
           <button class="icon-btn toggle-btn" data-id="${monitor.id}" title="${monitor.enabled ? 'Disable' : 'Enable'}">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
@@ -169,7 +175,7 @@ class PageWatchPopup {
           </button>
         </div>
       </div>
-      <div class="monitor-info">
+      <div class="monitor-status-row">
         <div class="monitor-status">
           <div class="status-indicator ${monitor.enabled ? '' : 'disabled'}"></div>
           <span>${monitor.enabled ? 'Active' : 'Disabled'}</span>
@@ -205,25 +211,45 @@ class PageWatchPopup {
   async startElementSelection() {
     if (!this.currentTab) return;
 
+    // Check if the current tab is a valid web page
+    if (!this.isValidWebPage(this.currentTab.url)) {
+      this.showError('Cannot monitor this type of page');
+      return;
+    }
+
     try {
+      // Try to inject content script if needed
+      await this.ensureContentScript();
+      
       await chrome.tabs.sendMessage(this.currentTab.id, {
         action: 'startElementSelection'
       });
       window.close();
     } catch (error) {
       console.error('Error starting element selection:', error);
+      this.showError('Cannot access this page. Try refreshing the page.');
     }
   }
 
   async highlightMonitors() {
     if (!this.currentTab) return;
 
+    // Check if the current tab is a valid web page
+    if (!this.isValidWebPage(this.currentTab.url)) {
+      this.showError('Cannot highlight monitors on this type of page');
+      return;
+    }
+
     try {
+      // Try to inject content script if needed
+      await this.ensureContentScript();
+      
       await chrome.tabs.sendMessage(this.currentTab.id, {
         action: 'highlightMonitors'
       });
     } catch (error) {
       console.error('Error highlighting monitors:', error);
+      this.showError('Cannot access this page. Try refreshing the page.');
     }
   }
 
@@ -350,6 +376,114 @@ class PageWatchPopup {
     if (diff < 3600000) return `${Math.floor(diff / 60000)}m ago`;
     if (diff < 86400000) return `${Math.floor(diff / 3600000)}h ago`;
     return `${Math.floor(diff / 86400000)}d ago`;
+  }
+
+  getDomainFromUrl(url) {
+    try {
+      return new URL(url).hostname;
+    } catch (error) {
+      return 'Unknown domain';
+    }
+  }
+
+  formatSelector(selector) {
+    // Remove long class chains and show a simplified version
+    if (selector.length > 50) {
+      // Try to extract meaningful parts
+      const parts = selector.split(' ');
+      const lastPart = parts[parts.length - 1];
+      
+      // If it's a complex class selector, simplify it
+      if (lastPart.includes('.')) {
+        const classes = lastPart.split('.');
+        const meaningfulClasses = classes.filter(cls => 
+          cls.length > 0 && cls.length < 20 && 
+          !cls.match(/^(aem-|grid|column|offset|default|medium|small)/i)
+        );
+        
+        if (meaningfulClasses.length > 0) {
+          return `.${meaningfulClasses[0]}${meaningfulClasses.length > 1 ? '...' : ''}`;
+        }
+      }
+      
+      // If it's an ID, show that
+      if (selector.includes('#')) {
+        const idMatch = selector.match(/#([^.\s>+~[]+)/);
+        if (idMatch) return `#${idMatch[1]}`;
+      }
+      
+      // If it's a tag selector, show that
+      const tagMatch = selector.match(/^([a-z]+)/i);
+      if (tagMatch) return `<${tagMatch[1]}>`;
+      
+      // Fallback to first 30 chars + ...
+      return selector.substring(0, 30) + '...';
+    }
+    
+    return selector;
+  }
+
+  isValidWebPage(url) {
+    if (!url) return false;
+    
+    // Check for invalid URLs
+    const invalidSchemes = ['chrome:', 'chrome-extension:', 'moz-extension:', 'about:', 'file:'];
+    return !invalidSchemes.some(scheme => url.startsWith(scheme));
+  }
+
+  async ensureContentScript() {
+    if (!this.currentTab) return;
+
+    try {
+      // First try to ping the content script
+      await chrome.tabs.sendMessage(this.currentTab.id, { action: 'ping' });
+    } catch (error) {
+      // Content script not loaded, try to inject it
+      try {
+        await chrome.scripting.executeScript({
+          target: { tabId: this.currentTab.id },
+          files: ['content.js']
+        });
+
+        await chrome.scripting.insertCSS({
+          target: { tabId: this.currentTab.id },
+          files: ['content.css']
+        });
+
+        // Wait a bit for the script to initialize
+        await new Promise(resolve => setTimeout(resolve, 100));
+      } catch (injectError) {
+        console.error('Failed to inject content script:', injectError);
+        throw new Error('Cannot inject script into this page');
+      }
+    }
+  }
+
+  showError(message) {
+    // Create error notification in popup
+    const errorDiv = document.createElement('div');
+    errorDiv.className = 'error-message';
+    errorDiv.textContent = message;
+    errorDiv.style.cssText = `
+      position: fixed;
+      top: 60px;
+      left: 20px;
+      right: 20px;
+      background: #f44336;
+      color: white;
+      padding: 12px;
+      border-radius: 4px;
+      font-size: 14px;
+      z-index: 1000;
+    `;
+    
+    document.body.appendChild(errorDiv);
+    
+    setTimeout(() => {
+      if (errorDiv.parentNode) {
+        errorDiv.remove();
+      }
+    }, 4000);
   }
 }
 

@@ -31,6 +31,10 @@ class PageWatchContent {
   addMessageListener() {
     chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       switch (message.action) {
+        case 'ping':
+          sendResponse({ success: true });
+          break;
+
         case 'startElementSelection':
           this.startElementSelection();
           sendResponse({ success: true });

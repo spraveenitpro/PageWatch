@@ -6,7 +6,8 @@
 }
 
 body {
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+    "Helvetica Neue", Arial, sans-serif;
   font-size: 14px;
   line-height: 1.4;
   color: #333;
@@ -14,7 +15,7 @@ body {
 }
 
 .popup-container {
-  width: 380px;
+  width: 580px;
   min-height: 500px;
   background: white;
   border-radius: 8px;
@@ -24,7 +25,7 @@ body {
 
 /* Header */
 .popup-header {
-  background: linear-gradient(135deg, #2196F3 0%, #1976D2 100%);
+  background: linear-gradient(135deg, #2196f3 0%, #1976d2 100%);
   color: white;
   padding: 16px 20px;
   display: flex;
@@ -107,12 +108,12 @@ body {
 }
 
 .btn-primary {
-  background: #2196F3;
+  background: #2196f3;
   color: white;
 }
 
 .btn-primary:hover {
-  background: #1976D2;
+  background: #1976d2;
 }
 
 .btn-secondary {
@@ -155,7 +156,7 @@ body {
 
 .monitor-count {
   background: #e3f2fd;
-  color: #1976D2;
+  color: #1976d2;
   padding: 2px 8px;
   border-radius: 12px;
   font-size: 12px;
@@ -193,7 +194,7 @@ body {
 }
 
 .monitor-item:hover {
-  border-color: #2196F3;
+  border-color: #2196f3;
   box-shadow: 0 2px 8px rgba(33, 150, 243, 0.1);
 }
 
@@ -201,18 +202,29 @@ body {
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
-  gap: 8px;
+  gap: 12px;
   margin-bottom: 8px;
 }
 
-.monitor-selector {
-  font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
-  font-size: 12px;
-  background: #fff;
-  padding: 4px 6px;
-  border-radius: 3px;
-  border: 1px solid #ddd;
+.monitor-info-main {
   flex: 1;
+  min-width: 0;
+}
+
+.monitor-domain {
+  font-weight: 600;
+  font-size: 14px;
+  color: #2196f3;
+  margin-bottom: 4px;
+}
+
+.monitor-selector {
+  font-family: "Monaco", "Menlo", "Ubuntu Mono", monospace;
+  font-size: 11px;
+  color: #666;
+  background: #f8f9fa;
+  padding: 2px 6px;
+  border-radius: 3px;
   word-break: break-all;
 }
 
@@ -229,16 +241,17 @@ body {
 }
 
 .monitor-actions .icon-btn:hover {
-  color: #2196F3;
+  color: #2196f3;
   background: #f0f8ff;
 }
 
-.monitor-info {
+.monitor-status-row {
   display: flex;
   align-items: center;
   justify-content: space-between;
   font-size: 12px;
   color: #666;
+  margin-bottom: 8px;
 }
 
 .monitor-status {
@@ -251,7 +264,7 @@ body {
   width: 8px;
   height: 8px;
   border-radius: 50%;
-  background: #4CAF50;
+  background: #4caf50;
 }
 
 .status-indicator.disabled {
@@ -391,7 +404,7 @@ body {
 .setting-item select:focus,
 .setting-item input[type="text"]:focus {
   outline: none;
-  border-color: #2196F3;
+  border-color: #2196f3;
   box-shadow: 0 0 0 2px rgba(33, 150, 243, 0.2);
 }
 
@@ -436,13 +449,13 @@ body {
     min-height: 100vh;
     border-radius: 0;
   }
-  
+
   .current-page {
     flex-direction: column;
     align-items: stretch;
     gap: 8px;
   }
-  
+
   .global-actions {
     flex-direction: column;
   }

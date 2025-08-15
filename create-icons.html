@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Icon Generator</title>
+</head>
+<body>
+    <canvas id="canvas" width="128" height="128"></canvas>
+    <div>
+        <button onclick="generateIcon(16)">16x16</button>
+        <button onclick="generateIcon(32)">32x32</button>
+        <button onclick="generateIcon(48)">48x48</button>
+        <button onclick="generateIcon(128)">128x128</button>
+    </div>
+
+    <script>
+        function generateIcon(size) {
+            const canvas = document.createElement('canvas');
+            canvas.width = size;
+            canvas.height = size;
+            const ctx = canvas.getContext('2d');
+            
+            // Background
+            ctx.fillStyle = '#2196F3';
+            ctx.fillRect(0, 0, size, size);
+            
+            // Eye icon
+            ctx.fillStyle = 'white';
+            const centerX = size / 2;
+            const centerY = size / 2;
+            const eyeWidth = size * 0.6;
+            const eyeHeight = size * 0.35;
+            
+            // Outer eye shape
+            ctx.beginPath();
+            ctx.ellipse(centerX, centerY, eyeWidth/2, eyeHeight/2, 0, 0, 2 * Math.PI);
+            ctx.fill();
+            
+            // Inner circle (pupil)
+            ctx.fillStyle = '#2196F3';
+            ctx.beginPath();
+            ctx.arc(centerX, centerY, size * 0.15, 0, 2 * Math.PI);
+            ctx.fill();
+            
+            // Download
+            const link = document.createElement('a');
+            link.download = `icon${size}.png`;
+            link.href = canvas.toDataURL();
+            link.click();
+        }
+    </script>
+</body>
+</html>

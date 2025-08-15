@@ -14,17 +14,43 @@ class PageWatchContent {
 
   async loadMonitors() {
     try {
-      const response = await chrome.runtime.sendMessage({
+      const currentUrl = window.location.href;
+      console.log('Loading monitors for URL:', currentUrl);
+      
+      // Try to get monitors for current URL
+      let response = await chrome.runtime.sendMessage({
         action: 'getMonitors',
-        url: window.location.href
+        url: currentUrl
       });
       
-      if (response && response.monitors) {
+      console.log('Monitors response for current URL:', response);
+      
+      // If no monitors found for exact URL, try getting all monitors and filter manually
+      if (!response || !response.monitors || response.monitors.length === 0) {
+        console.log('No monitors for exact URL, trying all monitors...');
+        response = await chrome.runtime.sendMessage({
+          action: 'getMonitors'
+        });
+        
+        if (response && response.monitors) {
+          // Filter monitors for current page (handle URL variations)
+          this.monitors = response.monitors.filter(monitor => {
+            return monitor.url === currentUrl || 
+                   monitor.url.replace(/[#?].*$/, '') === currentUrl.replace(/[#?].*$/, '');
+          });
+          console.log('Filtered monitors for current page:', this.monitors);
+        } else {
+          this.monitors = [];
+        }
+      } else {
         this.monitors = response.monitors;
-        this.addMonitorIndicators();
+        console.log('Loaded monitors for current page:', this.monitors);
       }
+      
+      this.addMonitorIndicators();
     } catch (error) {
       console.error('Error loading monitors:', error);
+      this.monitors = [];
     }
   }
 
@@ -51,6 +77,7 @@ class PageWatchContent {
           break;
 
         case 'highlightMonitors':
+          console.log('Highlighting monitors, count:', this.monitors.length);
           this.highlightMonitoredElements();
           sendResponse({ success: true });
           break;
@@ -171,18 +198,25 @@ class PageWatchContent {
   }
 
   generateSelector(element) {
-    if (element.id) {
-      return `#${element.id}`;
+    // Create a clean copy to work with (without extension classes)
+    const cleanElement = element.cloneNode(false);
+    
+    if (cleanElement.id) {
+      return `#${cleanElement.id}`;
     }
 
-    if (element.className) {
-      const classes = element.className.split(' ').filter(c => c.trim());
+    if (cleanElement.className) {
+      // Filter out PageWatch classes and get clean class list
+      const classes = cleanElement.className.split(' ')
+        .filter(c => c.trim() && !c.startsWith('pagewatch-'))
+        .filter(c => c.trim());
+      
       if (classes.length > 0) {
         return `.${classes.join('.')}`;
       }
     }
 
-    const tagName = element.tagName.toLowerCase();
+    const tagName = cleanElement.tagName.toLowerCase();
     const parent = element.parentNode;
     
     if (!parent || parent === document) {
@@ -338,23 +372,91 @@ class PageWatchContent {
     }, 3000);
   }
 
-  highlightMonitoredElements() {
-    this.monitors.forEach(monitor => {
+  async highlightMonitoredElements() {
+    console.log('Starting highlight process, monitors:', this.monitors);
+    
+    // First refresh monitors from storage to make sure we have the latest
+    await this.loadMonitors();
+    
+    if (this.monitors.length === 0) {
+      console.log('No monitors found for this page');
+      this.showMessage('No monitors found on this page', 'info');
+      return;
+    }
+
+    let highlightedCount = 0;
+    let fixedCount = 0;
+    
+    for (const [index, monitor] of this.monitors.entries()) {
       try {
-        const element = document.querySelector(monitor.selector);
+        console.log(`Attempting to highlight monitor ${index + 1}:`, monitor.selector);
+        let selector = monitor.selector;
+        let element = document.querySelector(selector);
+        
+        // If element not found and selector contains pagewatch classes, try to fix it
+        if (!element && selector.includes('pagewatch-')) {
+          console.log('Selector contains pagewatch classes, trying to fix...');
+          const fixedSelector = selector.replace(/\.pagewatch-[^\s.]*\.?/g, '').replace(/\.\./g, '.').replace(/\.$/, '');
+          console.log('Fixed selector:', fixedSelector);
+          
+          element = document.querySelector(fixedSelector);
+          if (element) {
+            console.log('Fixed selector works! Updating monitor...');
+            // Update the monitor with the correct selector
+            try {
+              await chrome.runtime.sendMessage({
+                action: 'updateMonitor',
+                monitorId: monitor.id,
+                data: { selector: fixedSelector }
+              });
+              monitor.selector = fixedSelector; // Update local copy
+              fixedCount++;
+            } catch (updateError) {
+              console.error('Error updating monitor selector:', updateError);
+            }
+          }
+        }
+        
         if (element) {
-          element.style.outline = '2px solid #4CAF50';
-          element.style.outlineOffset = '2px';
+          console.log('Found element, highlighting...');
+          // Use a more visible highlight
+          element.style.outline = '3px solid #4CAF50';
+          element.style.outlineOffset = '3px';
+          element.style.backgroundColor = 'rgba(76, 175, 80, 0.1)';
+          element.style.transition = 'all 0.3s ease';
+          
+          // Add a pulsing effect
+          element.style.animation = 'pagewatch-pulse-highlight 2s ease-in-out';
+          
+          highlightedCount++;
           
           setTimeout(() => {
-            element.style.outline = '';
-            element.style.outlineOffset = '';
-          }, 2000);
+            if (element.parentNode) { // Check if element still exists
+              element.style.outline = '';
+              element.style.outlineOffset = '';
+              element.style.backgroundColor = '';
+              element.style.animation = '';
+            }
+          }, 3000);
+        } else {
+          console.warn('Element not found for selector:', monitor.selector);
         }
       } catch (error) {
-        console.error('Error highlighting monitored element:', error);
+        console.error('Error highlighting monitored element:', error, monitor);
       }
-    });
+    }
+
+    // Show feedback message
+    let message = '';
+    if (highlightedCount > 0) {
+      message = `Highlighted ${highlightedCount} monitored element${highlightedCount > 1 ? 's' : ''}`;
+      if (fixedCount > 0) {
+        message += ` (fixed ${fixedCount} selector${fixedCount > 1 ? 's' : ''})`;
+      }
+      this.showMessage(message, 'success');
+    } else {
+      this.showMessage('No monitored elements found on this page', 'info');
+    }
   }
 }
 

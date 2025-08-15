@@ -11,6 +11,7 @@ class MonitorsPage {
     };
     this.currentEditingMonitor = null;
     this.refreshInterval = null;
+    this.countdownInterval = null;
     this.init();
   }
 
@@ -141,6 +142,7 @@ class MonitorsPage {
     this.updateSiteFilter();
     this.updateMonitorsList();
     this.updateBulkActionButtons();
+    this.startCountdownTimer();
     
     // Hide loading state
     document.getElementById('loadingState').style.display = 'none';
@@ -269,6 +271,7 @@ class MonitorsPage {
         <div class="monitor-stats">
           <span>Changes: ${monitor.changeCount || 0}</span>
           <span>Last check: ${monitor.lastCheck ? this.formatTime(monitor.lastCheck) : 'Never'}</span>
+          <span class="next-check" data-monitor-id="${monitor.id}">Next check: ${this.formatNextCheck(monitor)}</span>
           <span>Created: ${this.formatTime(monitor.created)}</span>
         </div>
       </div>
@@ -584,6 +587,80 @@ class MonitorsPage {
     if (diff < 2592000000) return `${Math.floor(diff / 86400000)}d ago`;
     
     return date.toLocaleDateString();
+  }
+
+  formatNextCheck(monitor) {
+    if (!monitor.enabled) {
+      return 'Disabled';
+    }
+
+    if (!monitor.nextCheck) {
+      return 'Scheduled';
+    }
+
+    const now = Date.now();
+    const timeUntilCheck = monitor.nextCheck - now;
+
+    if (timeUntilCheck <= 0) {
+      return 'Checking now...';
+    }
+
+    return this.formatCountdown(timeUntilCheck);
+  }
+
+  formatCountdown(milliseconds) {
+    const seconds = Math.floor(milliseconds / 1000);
+    
+    if (seconds < 60) {
+      return `${seconds}s`;
+    } else if (seconds < 3600) {
+      const minutes = Math.floor(seconds / 60);
+      const remainingSeconds = seconds % 60;
+      return `${minutes}m ${remainingSeconds}s`;
+    } else {
+      const hours = Math.floor(seconds / 3600);
+      const minutes = Math.floor((seconds % 3600) / 60);
+      return `${hours}h ${minutes}m`;
+    }
+  }
+
+  startCountdownTimer() {
+    // Clear existing timer
+    if (this.countdownInterval) {
+      clearInterval(this.countdownInterval);
+    }
+
+    // Update countdown every second
+    this.countdownInterval = setInterval(() => {
+      this.updateCountdowns();
+    }, 1000);
+
+    // Update immediately
+    this.updateCountdowns();
+  }
+
+  updateCountdowns() {
+    const countdownElements = document.querySelectorAll('.next-check');
+    
+    countdownElements.forEach(element => {
+      const monitorId = element.getAttribute('data-monitor-id');
+      const monitor = this.monitors.find(m => m.id === monitorId);
+      
+      if (monitor) {
+        const countdownText = this.formatNextCheck(monitor);
+        element.textContent = `Next check: ${countdownText}`;
+        
+        // Add visual indicator for imminent checks
+        const now = Date.now();
+        const timeUntilCheck = monitor.nextCheck - now;
+        
+        if (timeUntilCheck <= 10000 && timeUntilCheck > 0) { // Last 10 seconds
+          element.classList.add('countdown-urgent');
+        } else {
+          element.classList.remove('countdown-urgent');
+        }
+      }
+    });
   }
 }
 

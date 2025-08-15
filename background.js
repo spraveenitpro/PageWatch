@@ -103,6 +103,9 @@ class PageWatchBackground {
     const monitors = await this.getAllMonitors();
     const monitorId = this.generateId();
     
+    const now = Date.now();
+    const intervalMs = (monitorData.interval || 60) * 1000;
+    
     const monitor = {
       id: monitorId,
       url: monitorData.url,
@@ -110,8 +113,9 @@ class PageWatchBackground {
       content: monitorData.content,
       interval: monitorData.interval || 60, // seconds
       enabled: true,
-      created: Date.now(),
+      created: now,
       lastCheck: null,
+      nextCheck: now + intervalMs,
       changeCount: 0
     };
 
@@ -173,7 +177,7 @@ class PageWatchBackground {
     return result.monitors || {};
   }
 
-  createAlarm(monitorId, intervalSeconds) {
+  async createAlarm(monitorId, intervalSeconds) {
     if (!chrome.alarms) {
       console.warn('Alarms API not available');
       return;
@@ -185,6 +189,13 @@ class PageWatchBackground {
         delayInMinutes: intervalSeconds / 60,
         periodInMinutes: intervalSeconds / 60
       });
+
+      // Update the nextCheck timestamp
+      const monitors = await this.getAllMonitors();
+      if (monitors[monitorId]) {
+        monitors[monitorId].nextCheck = Date.now() + (intervalSeconds * 1000);
+        await chrome.storage.local.set({ monitors });
+      }
     } catch (error) {
       console.error('Error creating alarm:', error);
     }
@@ -217,6 +228,11 @@ class PageWatchBackground {
       
       if (tabs.length === 0) {
         console.log(`No active tabs found for URL: ${monitor.url}`);
+        // Still update timestamps even if no tab is open
+        const now = Date.now();
+        monitor.lastCheck = now;
+        monitor.nextCheck = now + (monitor.interval * 1000);
+        await chrome.storage.local.set({ monitors });
         return;
       }
 
@@ -226,11 +242,13 @@ class PageWatchBackground {
         selector: monitor.selector
       });
 
+      const now = Date.now();
+      monitor.lastCheck = now;
+      monitor.nextCheck = now + (monitor.interval * 1000);
+
       if (response && response.content !== undefined) {
         const currentContent = response.content;
         const hasChanged = currentContent !== monitor.content;
-
-        monitor.lastCheck = Date.now();
 
         if (hasChanged) {
           monitor.changeCount++;
@@ -243,9 +261,17 @@ class PageWatchBackground {
         } else {
           await chrome.storage.local.set({ monitors });
         }
+      } else {
+        // Update timestamps even if check failed
+        await chrome.storage.local.set({ monitors });
       }
     } catch (error) {
       console.error(`Error checking monitor ${monitorId}:`, error);
+      // Still update timestamps on error
+      const now = Date.now();
+      monitor.lastCheck = now;
+      monitor.nextCheck = now + (monitor.interval * 1000);
+      await chrome.storage.local.set({ monitors });
     }
   }
 

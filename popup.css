@@ -282,7 +282,28 @@ body {
   font-size: 11px;
   color: #999;
   display: flex;
-  justify-content: space-between;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.monitor-stats span {
+  display: block;
+}
+
+.next-check {
+  font-weight: 500;
+  color: #2196f3 !important;
+}
+
+.countdown-urgent {
+  color: #ff5722 !important;
+  animation: pulse 1s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  0% { opacity: 1; }
+  50% { opacity: 0.6; }
+  100% { opacity: 1; }
 }
 
 /* Global Actions */

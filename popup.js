@@ -8,6 +8,7 @@ class PageWatchPopup {
       enableSound: false
     };
     this.currentEditingMonitor = null;
+    this.countdownInterval = null;
     this.init();
   }
 
@@ -119,6 +120,7 @@ class PageWatchPopup {
     this.updatePageInfo();
     this.updateMonitorsList();
     this.updateMonitorCount();
+    this.startCountdownTimer();
   }
 
   updatePageInfo() {
@@ -185,6 +187,7 @@ class PageWatchPopup {
       <div class="monitor-stats">
         <span>Changes: ${monitor.changeCount || 0}</span>
         <span>Last check: ${monitor.lastCheck ? this.formatTime(monitor.lastCheck) : 'Never'}</span>
+        <span class="next-check" data-monitor-id="${monitor.id}">Next check: ${this.formatNextCheck(monitor)}</span>
       </div>
     `;
 
@@ -244,12 +247,14 @@ class PageWatchPopup {
       // Try to inject content script if needed
       await this.ensureContentScript();
       
-      await chrome.tabs.sendMessage(this.currentTab.id, {
+      const response = await chrome.tabs.sendMessage(this.currentTab.id, {
         action: 'highlightMonitors'
       });
+      
+      console.log('Highlight response:', response);
     } catch (error) {
       console.error('Error highlighting monitors:', error);
-      this.showError('Cannot access this page. Try refreshing the page.');
+      this.showError('Cannot highlight monitors on this page. Try refreshing the page.');
     }
   }
 
@@ -383,6 +388,87 @@ class PageWatchPopup {
       return new URL(url).hostname;
     } catch (error) {
       return 'Unknown domain';
+    }
+  }
+
+  formatNextCheck(monitor) {
+    if (!monitor.enabled) {
+      return 'Disabled';
+    }
+
+    if (!monitor.nextCheck) {
+      return 'Scheduled';
+    }
+
+    const now = Date.now();
+    const timeUntilCheck = monitor.nextCheck - now;
+
+    if (timeUntilCheck <= 0) {
+      return 'Checking now...';
+    }
+
+    return this.formatCountdown(timeUntilCheck);
+  }
+
+  formatCountdown(milliseconds) {
+    const seconds = Math.floor(milliseconds / 1000);
+    
+    if (seconds < 60) {
+      return `${seconds}s`;
+    } else if (seconds < 3600) {
+      const minutes = Math.floor(seconds / 60);
+      const remainingSeconds = seconds % 60;
+      return `${minutes}m ${remainingSeconds}s`;
+    } else {
+      const hours = Math.floor(seconds / 3600);
+      const minutes = Math.floor((seconds % 3600) / 60);
+      return `${hours}h ${minutes}m`;
+    }
+  }
+
+  startCountdownTimer() {
+    // Clear existing timer
+    if (this.countdownInterval) {
+      clearInterval(this.countdownInterval);
+    }
+
+    // Update countdown every second
+    this.countdownInterval = setInterval(() => {
+      this.updateCountdowns();
+    }, 1000);
+
+    // Update immediately
+    this.updateCountdowns();
+  }
+
+  updateCountdowns() {
+    const countdownElements = document.querySelectorAll('.next-check');
+    
+    countdownElements.forEach(element => {
+      const monitorId = element.getAttribute('data-monitor-id');
+      const monitor = this.monitors.find(m => m.id === monitorId);
+      
+      if (monitor) {
+        const countdownText = this.formatNextCheck(monitor);
+        element.textContent = `Next check: ${countdownText}`;
+        
+        // Add visual indicator for imminent checks
+        const now = Date.now();
+        const timeUntilCheck = monitor.nextCheck - now;
+        
+        if (timeUntilCheck <= 10000 && timeUntilCheck > 0) { // Last 10 seconds
+          element.classList.add('countdown-urgent');
+        } else {
+          element.classList.remove('countdown-urgent');
+        }
+      }
+    });
+  }
+
+  // Clean up timer when popup closes
+  destroy() {
+    if (this.countdownInterval) {
+      clearInterval(this.countdownInterval);
     }
   }
 

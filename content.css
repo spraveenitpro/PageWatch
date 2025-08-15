@@ -162,6 +162,21 @@
   }
 }
 
+@keyframes pagewatch-pulse-highlight {
+  0% {
+    outline-color: #4CAF50;
+    background-color: rgba(76, 175, 80, 0.1);
+  }
+  50% {
+    outline-color: #388E3C;
+    background-color: rgba(76, 175, 80, 0.3);
+  }
+  100% {
+    outline-color: #4CAF50;
+    background-color: rgba(76, 175, 80, 0.1);
+  }
+}
+
 .pagewatch-highlight {
   animation: pagewatch-pulse 1s ease-in-out infinite !important;
 }
